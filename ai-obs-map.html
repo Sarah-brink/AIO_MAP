@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI OBS map</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #0b0b0b;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    #app {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #toolbar {
+      padding: 10px 14px;
+      background: #0b0b0b;
+      color: #ffffff;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    #toolbar label {
+      font-size: 14px;
+      opacity: 0.85;
+    }
+
+    #themeSelect {
+      background: #111;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 14px;
+    }
+
+    #themeDot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      border: 1px solid rgba(255,255,255,0.35);
+      background: #ffffff; /* default */
+    }
+
+    #map {
+      flex: 1;
+      background: #0b0b0b;
+    }
+
+    /* Hide Leaflet attribution */
+    .leaflet-control-attribution { display: none; }
+
+    .leaflet-popup-content {
+      font-size: 13px;
+      line-height: 1.35;
+      margin: 12px 14px;
+    }
+
+    .leaflet-popup-content-wrapper {
+      color: #111;
+      border-radius: 16px;
+    }
+
+    .popup-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .popup-sub {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-bottom: 6px;
+    }
+
+    .theme-chips {
+      margin-top: 12px; /* <-- adds the padding you wanted above chips */
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .theme-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.06);
+      border: 1px solid rgba(0,0,0,0.12);
+      font-size: 12px;
+      color: #111;
+      white-space: nowrap;
+    }
+
+    .theme-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      display: inline-block;
+      border: 1px solid rgba(255,255,255,0.35);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <div id="toolbar">
+      <label for="themeSelect">Explore by theme</label>
+      <span id="themeDot" aria-hidden="true"></span>
+      <select id="themeSelect"></select>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    window.addEventListener("load", () => {
+      /* ============================================================
+         PROJECT DATA
+         ============================================================ */
+
+      const projects = [
+        {
+          iso_a3: "PAK",
+          country: "Pakistan",
+          project: "Ministry of Federal Education",
+          description:
+            "Exploring how digital tools and AI can strengthen education data systems and decision-making.",
+          themes: ["Student assessment", "Accurate data"]
+        },
+        {
+          iso_a3: "PHL",
+          country: "Philippines",
+          project: "Department of Education",
+          description:
+            "Testing how automation can improve operational efficiency across education systems.",
+          themes: ["Accurate data"]
+        },
+        {
+          iso_a3: "BGD",
+          country: "Bangladesh",
+          project: "Ministry of Education",
+          description:
+            "Developing data dashboards to support national assessment and learner tracking.",
+          themes: ["Accessible information"]
+        },
+        {
+          iso_a3: "KEN",
+          country: "Kenya",
+          project: "Ministry of Education",
+          description:
+            "Work in Kenya supporting education system stakeholders to test practical ways digital tools can strengthen delivery and decision-making.",
+          themes: ["Accessible information", "Accurate data"]
+        },
+        {
+          iso_a3: "NGA",
+          country: "Nigeria",
+          project: "Federal Ministry of Education",
+          description:
+            "Work in Nigeria exploring how targeted digital solutions can improve operational efficiency and the quality of information used for action.",
+          themes: ["Accurate data", "Student assessment"]
+        },
+        {
+          iso_a3: "SLE",
+          country: "Sierra Leone",
+          project: "Ministry of Basic and Senior Secondary School Education",
+          description:
+            "Work in Sierra Leone testing focused, user-centred digital approaches that support frontline implementation and clearer communication.",
+          themes: ["Student assessment", "Accessible information"]
+        }
+      ];
+
+      const projectByIso = new Map(
+        projects.map(p => [String(p.iso_a3).trim().toUpperCase(), p])
+      );
+
+      /* ============================================================
+         THEME COLOURS
+         ============================================================ */
+
+      const themeColors = {
+        "Student assessment": "#ff4d6d",
+        "Accurate data": "#4dabf7",
+        "Accessible information": "#51cf66"
+      };
+
+      const defaultColor = "#ffffff";
+
+      /* ============================================================
+         THEME DROPDOWN + DOT
+         ============================================================ */
+
+      const themes = Array.from(new Set(projects.flatMap(p => p.themes))).sort();
+      const themeSelect = document.getElementById("themeSelect");
+      const themeDot = document.getElementById("themeDot");
+
+      themeSelect.innerHTML = "";
+
+      const allOpt = document.createElement("option");
+      allOpt.value = "__ALL__";
+      allOpt.textContent = "All projects";
+      themeSelect.appendChild(allOpt);
+
+      for (const t of themes) {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        themeSelect.appendChild(opt);
+      }
+
+      function currentThemeColor() {
+        const selected = themeSelect.value;
+        if (selected === "__ALL__") return defaultColor;
+        return themeColors[selected] || defaultColor;
+      }
+
+      function updateThemeDot() {
+        if (!themeDot) return;
+        themeDot.style.background = currentThemeColor();
+      }
+
+      updateThemeDot();
+
+      /* ============================================================
+         MAP SETUP (NO BASEMAP)
+         ============================================================ */
+
+      const map = L.map("map", {
+        zoomControl: true,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        touchZoom: true,
+        dragging: true,
+        zoomSnap: 0.5
+      }).setView([15, 15], 2);
+
+      map.zoomControl.setPosition("topright");
+
+      /* ============================================================
+         HELPERS
+         ============================================================ */
+
+      function isActiveTheme(project, selectedTheme) {
+        if (!project) return false;
+        if (selectedTheme === "__ALL__") return true;
+        return project.themes.includes(selectedTheme);
+      }
+
+      function getIsoFromFeature(feature) {
+        const props = feature?.properties || {};
+        const iso =
+          props.ADM0_A3 ?? props.ISO_A3 ?? props.iso_a3 ?? props.ISO3 ?? props.id ?? "";
+        return String(iso).trim().toUpperCase();
+      }
+
+      function renderThemeChips(themeList) {
+        return `
+          <div class="theme-chips">
+            ${themeList.map(t => {
+              const c = themeColors[t] || defaultColor;
+              return `
+                <span class="theme-chip">
+                  <span class="theme-dot" style="background:${c}"></span>
+                  ${t}
+                </span>
+              `;
+            }).join("")}
+          </div>
+        `;
+      }
+
+      function regionStyle(feature) {
+        const iso = getIsoFromFeature(feature);
+        const project = projectByIso.get(iso);
+        const selected = themeSelect.value;
+
+        const base = {
+          color: "#ffffff",
+          weight: 0.8,
+          opacity: 0.35,
+          fillOpacity: 0
+        };
+
+        if (!project) return base;
+
+        const active = isActiveTheme(project, selected);
+        if (!active) return base;
+
+        const fill = selected === "__ALL__"
+          ? defaultColor
+          : (themeColors[selected] || defaultColor);
+
+        return {
+          ...base,
+          opacity: 0.95,
+          weight: 1.4,
+          fillColor: fill,
+          fillOpacity: 0.6
+        };
+      }
+
+      /* ============================================================
+         LOAD GEOJSON + INTERACTION
+         ============================================================ */
+
+      let geoLayer = null;
+
+      const GEOJSON_URL =
+        "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson";
+
+      async function init() {
+        let geojson;
+        try {
+          const res = await fetch(GEOJSON_URL);
+          if (!res.ok) throw new Error(`GeoJSON fetch failed: ${res.status} ${res.statusText}`);
+          geojson = await res.json();
+        } catch (e) {
+          console.error(e);
+          alert("Could not load country boundaries (GeoJSON). Check the console for details.");
+          return;
+        }
+
+        geoLayer = L.geoJSON(geojson, {
+          style: regionStyle,
+          onEachFeature: (feature, layer) => {
+            const iso = getIsoFromFeature(feature);
+            const proj = projectByIso.get(iso);
+            if (!proj) return;
+
+            const html = `
+              <div class="popup-title">${proj.project}</div>
+              <div class="popup-sub">${proj.country}</div>
+              <div>${proj.description}</div>
+              ${renderThemeChips(proj.themes)}
+            `;
+
+            layer.bindPopup(html, {
+              maxWidth: 320,
+              closeButton: false,
+              autoPan: false
+            });
+
+            layer.on("mouseover", () => {
+              layer.setStyle({
+                weight: 1.8,
+                opacity: 1,
+                fillColor: currentThemeColor(),
+                fillOpacity: 0.75
+              });
+              layer.openPopup();
+            });
+
+            layer.on("mouseout", () => {
+              geoLayer.resetStyle(layer);
+              layer.closePopup();
+            });
+
+            layer.on("click", () => {
+              layer.openPopup();
+            });
+          }
+        }).addTo(map);
+
+        // Fit bounds to your project countries
+        const bounds = [];
+        geoLayer.eachLayer(l => {
+          const iso = getIsoFromFeature(l.feature);
+          if (projectByIso.has(iso)) bounds.push(l.getBounds());
+        });
+
+        if (bounds.length) {
+          const combined = bounds.reduce((acc, b) => acc.extend(b), bounds[0]);
+          map.fitBounds(combined.pad(0.3));
+        }
+      }
+
+      themeSelect.addEventListener("change", () => {
+        updateThemeDot();
+        if (geoLayer) geoLayer.setStyle(regionStyle);
+      });
+
+      init();
+    });
+  </script>
+</body>
+</html>
