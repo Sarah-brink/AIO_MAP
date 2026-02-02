@@ -12,7 +12,7 @@
     html, body {
       height: 100%;
       margin: 0;
-      background: #0b0b0b;
+      background: #1f1e2c;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
 
@@ -24,7 +24,7 @@
 
     #toolbar {
       padding: 10px 14px;
-      background: #0b0b0b;
+      background: #1f1e2c;
       color: #ffffff;
       display: flex;
       gap: 10px;
@@ -38,7 +38,7 @@
     }
 
     #themeSelect {
-      background: #111;
+      background: #1f1e2c;
       color: #fff;
       border: 1px solid rgba(255,255,255,0.2);
       border-radius: 6px;
@@ -195,9 +195,9 @@
          ============================================================ */
 
       const themeColors = {
-        "Student assessment": "#ff4d6d",
-        "Accurate data": "#4dabf7",
-        "Accessible information": "#51cf66"
+        "Student assessment": "#4efff0",
+        "Accurate data": "#f3b1ae",
+        "Accessible information": "#27aab8"
       };
 
       const defaultColor = "#ffffff";
@@ -242,15 +242,13 @@
          ============================================================ */
 
       const map = L.map("map", {
-        zoomControl: true,
+        zoomControl: false,
         scrollWheelZoom: true,
         doubleClickZoom: true,
         touchZoom: true,
         dragging: true,
         zoomSnap: 0.5
       }).setView([15, 15], 2);
-
-      map.zoomControl.setPosition("topright");
 
       /* ============================================================
          HELPERS
@@ -293,7 +291,7 @@
         const base = {
           color: "#ffffff",
           weight: 0.8,
-          opacity: 0.35,
+          opacity: 0.75,
           fillOpacity: 0
         };
 
@@ -309,7 +307,7 @@
         return {
           ...base,
           opacity: 0.95,
-          weight: 1.4,
+          weight: 2,
           fillColor: fill,
           fillOpacity: 0.6
         };
